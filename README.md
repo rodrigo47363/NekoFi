@@ -103,7 +103,3 @@ Este proyecto está bajo la licencia MIT. Vea el archivo [LICENSE](LICENSE) para
 
 Rodrigo  
 [GitHub](https://github.com/rodrigo47363) | [Portafolio Web](https://rodrigo47363.github.io)
-
----
-
-Este README proporciona una visión completa de tu herramienta `NekoFi.sh`, detallando sus características, requisitos, instalación, uso y cómo contribuir. Puedes ajustarlo según sea necesario para reflejar cualquier cambio adicional en tu proyecto.
