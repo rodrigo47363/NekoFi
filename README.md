@@ -1,105 +1,115 @@
-Claro, aquí tienes un README profesional para tu script `NekoFi.sh`:
-
----
-
 # NekoFi.sh
 
-[![NekoFi](https://img.shields.io/badge/NekoFi-1.0-brightgreen)](https://github.com/rodrigo47363/NekoFi)
-[![License](https://img.shields.io/badge/License-MIT-blue)](LICENSE)
+**Versión 1.1**
 
-NekoFi.sh es una herramienta avanzada y automatizada para realizar auditorías de seguridad en redes WiFi. Diseñada para pentesters y entusiastas de la ciberseguridad, NekoFi.sh ofrece diversas opciones de ataque para evaluar la seguridad de redes inalámbricas.
+[![GitHub Release](https://img.shields.io/github/v/release/rodrigo47363/NekoFi)](https://github.com/rodrigo47363/NekoFi/releases)
+[![License](https://img.shields.io/github/license/rodrigo47363/NekoFi)](https://github.com/rodrigo47363/NekoFi/blob/main/LICENSE)
+[![Issues](https://img.shields.io/github/issues/rodrigo47363/NekoFi)](https://github.com/rodrigo47363/NekoFi/issues)
+
+NekoFi.sh es un script de Bash diseñado para facilitar diversas tareas de auditoría y pruebas de seguridad en redes WiFi. Con NekoFi.sh, puedes escanear redes, capturar handshakes, y realizar ataques WPS y WPA/WPA2, entre otras funcionalidades.
 
 ## Características
 
-- **Instalación Automática de Herramientas:** Verifica e instala todas las herramientas necesarias.
-- **Modo Monitor:** Administra automáticamente el modo monitor de la interfaz inalámbrica.
-- **Varias Opciones de Ataque:**
-  - Escaneo de redes WiFi
-  - Captura de Handshake (WPS/PMKID)
-  - Ataques WPS con Reaver, PixieWPS y Bully
-  - Ataques WPA/WPA2
-  - Ataques WEP
-  - Creación de diccionarios personalizados con Crunch y Cowpatty
-- **Menú Interactivo:** Fácil de usar con opciones claras y detalladas.
+- **Escaneo de redes WiFi** usando `wash`
+- **Captura de handshakes (WPS/PMKID)** con `hcxdumptool`
+- **Ataques WPS** con `Reaver`, `PixieWPS` y `Bully`
+- **Ataques WPA/WPA2** con diccionarios
+- **Ataques WEP**
+- **Creación de diccionarios** con `Crunch` y `Cowpatty`
+- **Gestión de modo monitor y managed** para interfaces de red
+- **Actualización automática** desde GitHub
 
 ## Requisitos
 
-- **Sistema Operativo:** Linux (probado en Debian/Ubuntu)
-- **Privilegios de Superusuario:** Algunas funciones requieren permisos de superusuario.
+NekoFi.sh requiere las siguientes herramientas:
+
+- `iw`
+- `aircrack-ng`
+- `xterm`
+- `tmux`
+- `iproute2`
+- `pciutils`
+- `usbutils`
+- `rfkill`
+- `wget`
+- `ccze`
+- `x11-xserver-utils`
+- `systemd`
+- `hashcat`
+- `reaver`
+- `hcxdumptool`
+- `john`
+- `pixiewps`
+- `bully`
+- `cowpatty`
+- `crunch`
+- `wash`
+- `procps`
+- `airgeddon`
+
+El script verifica e instala automáticamente estas herramientas si no están presentes en el sistema.
 
 ## Instalación
 
-1. **Clonar el repositorio:**
-   ```bash
-   git clone https://github.com/rodrigo47363/NekoFi.git
-   cd NekoFi
-   ```
+Para instalar y ejecutar NekoFi.sh, sigue los siguientes pasos:
 
-2. **Dar permisos de ejecución:**
-   ```bash
-   chmod +x NekoFi.sh
-   ```
+1. Clona el repositorio o descarga el script directamente:
 
-3. **Ejecutar el script:**
-   ```bash
-   sudo ./NekoFi.sh
-   ```
+    ```bash
+    git clone https://github.com/rodrigo47363/NekoFi
+    cd NekoFi
+    chmod +x NekoFi.sh
+    ```
+
+2. Ejecuta el script con permisos de superusuario:
+
+    ```bash
+    sudo ./NekoFi.sh
+    ```
 
 ## Uso
 
-Al ejecutar `NekoFi.sh`, se presentará un menú interactivo con las siguientes opciones:
+Al ejecutar NekoFi.sh, se presentará un menú con las siguientes opciones:
 
-1. **Escanear redes WiFi:** Utiliza wash para escanear redes WiFi disponibles.
-2. **Capturar Handshake (WPS/PMKID):** Usa hcxdumptool para capturar handshakes WPS/PMKID.
-3. **Ataque WPS con Reaver:** Ataca redes con WPS usando Reaver.
-4. **Ataque WPS con PixieWPS:** Ataca redes con WPS usando PixieWPS.
-5. **Ataque WPS con Bully:** Ataca redes con WPS usando Bully.
-6. **Ataque WPA/WPA2:** Realiza un ataque WPA/WPA2 usando un diccionario.
-7. **Ataque WEP:** Realiza un ataque WEP.
-8. **Crear diccionario con Crunch:** Crea un diccionario de contraseñas con Crunch.
-9. **Crear diccionario personalizado con Cowpatty:** Crea un diccionario personalizado con Cowpatty.
-10. **Salir:** Cierra el script.
-0. **Ayuda:** Muestra ayuda detallada sobre las opciones disponibles.
+1. Escanear redes WiFi
+2. Capturar Handshake (WPS/PMKID)
+3. Ataque WPS con Reaver
+4. Ataque WPS con PixieWPS
+5. Ataque WPS con Bully
+6. Ataque WPA/WPA2
+7. Ataque WEP
+8. Crear diccionario con Crunch
+9. Crear diccionario personalizado con Cowpatty
+10. Poner interfaz en modo monitor
+11. Poner interfaz en modo managed
+12. Salir
+13. Actualizar NekoFi.sh desde GitHub
+0. Ayuda
 
-## Ejemplo de Uso
+### Ejemplo de Uso
 
-### Escaneo de Redes WiFi
+1. **Escanear Redes WiFi**
 
-Para escanear redes WiFi disponibles:
+    Selecciona la opción `1` para escanear redes WiFi. El script pondrá la interfaz seleccionada en modo monitor y ejecutará `wash` para listar las redes disponibles.
 
-1. Seleccione la opción "1. Escanear redes WiFi" en el menú.
-2. El script iniciará el modo monitor y utilizará wash para listar las redes disponibles.
+2. **Capturar Handshake (WPS/PMKID)**
 
-### Captura de Handshake (WPS/PMKID)
+    Selecciona la opción `2` para capturar handshakes WPS/PMKID. El script pondrá la interfaz en modo monitor, ejecutará `hcxdumptool` y extraerá los PMKIDs capturados.
 
-Para capturar un handshake:
+3. **Ataque WPS con Reaver**
 
-1. Seleccione la opción "2. Capturar Handshake (WPS/PMKID)" en el menú.
-2. El script iniciará el modo monitor y usará hcxdumptool para capturar los handshakes.
+    Selecciona la opción `3`, ingresa el BSSID y el canal de la red objetivo, y el script ejecutará `reaver` para iniciar el ataque WPS.
 
-### Ataque WPA/WPA2
-
-Para realizar un ataque WPA/WPA2:
-
-1. Seleccione la opción "6. Ataque WPA/WPA2" en el menú.
-2. Ingrese el BSSID y el canal de la red objetivo.
-3. Proporcione la ruta a un diccionario de contraseñas.
-4. El script realizará el ataque y tratará de descifrar la contraseña usando aircrack-ng.
+Para más detalles, selecciona la opción `0` en el menú para ver la ayuda completa.
 
 ## Contribuciones
 
-Las contribuciones son bienvenidas. Por favor, siga estos pasos para contribuir:
-
-1. **Fork el repositorio.**
-2. **Cree una nueva rama (feature/nueva-caracteristica).**
-3. **Realice sus cambios.**
-4. **Envíe un pull request.**
+Las contribuciones son bienvenidas. Si encuentras un problema o tienes una sugerencia, abre un [issue](https://github.com/rodrigo47363/NekoFi/issues) o envía un pull request.
 
 ## Licencia
 
-Este proyecto está bajo la licencia MIT. Vea el archivo [LICENSE](LICENSE) para más detalles.
+Este proyecto está licenciado bajo la [Licencia MIT](LICENSE).
 
 ## Contacto
 
-Rodrigo  
-[GitHub](https://github.com/rodrigo47363) | [Portafolio Web](https://rodrigo47363.github.io)
+Para más información, visita mi perfil de GitHub: [rodrigo47363](https://github.com/rodrigo47363)
