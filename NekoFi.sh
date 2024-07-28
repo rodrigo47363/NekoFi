@@ -7,7 +7,7 @@ LOCAL_PATH="/usr/local/bin/$SCRIPT_NAME"
 # Lista de herramientas necesarias
 tools=(
     iw aircrack-ng xterm tmux iproute2 pciutils usbutils rfkill wget ccze x11-xserver-utils systemd hashcat reaver hcxdumptool
-    hcxpcaptool john pixiewps bully cowpatty crunch wash procps airgeddon
+     john pixiewps bully cowpatty crunch wash procps airgeddon
 )
 
 # Función para verificar e instalar herramientas necesarias
