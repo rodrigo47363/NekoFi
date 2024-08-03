@@ -1,6 +1,6 @@
 # NekoFi.sh
 
-**Versión 1.1**
+**Versión 1.3**
 
 [![GitHub Release](https://img.shields.io/github/v/release/rodrigo47363/NekoFi)](https://github.com/rodrigo47363/NekoFi/releases)
 [![License](https://img.shields.io/github/license/rodrigo47363/NekoFi)](https://github.com/rodrigo47363/NekoFi/blob/main/LICENSE)
