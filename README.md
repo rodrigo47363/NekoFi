@@ -12,7 +12,7 @@ NekoFi.sh es un script de Bash diseñado para facilitar diversas tareas de audit
 
 - **Escaneo de redes WiFi** usando `wash`
 - **Captura de handshakes (WPS/PMKID)** con `hcxdumptool`
-- **Ataques WPS** con `Reaver`, `PixieWPS` y `Bully`
+- **Ataques WPS** con `Reaver`, `PixieWPS`, y `Bully`
 - **Ataques WPA/WPA2** con diccionarios
 - **Ataques WEP**
 - **Creación de diccionarios** con `Crunch` y `Cowpatty`
@@ -84,6 +84,7 @@ Al ejecutar NekoFi.sh, se presentará un menú con las siguientes opciones:
 11. Poner interfaz en modo managed
 12. Salir
 13. Actualizar NekoFi.sh desde GitHub
+14. Convertir .cap a .hccapx
 0. Ayuda
 
 ### Ejemplo de Uso
