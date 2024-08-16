@@ -1,12 +1,12 @@
 # NekoFi.sh
 
-**Versión 1.3**
+**Versión 1.4**
 
 [![GitHub Release](https://img.shields.io/github/v/release/rodrigo47363/NekoFi)](https://github.com/rodrigo47363/NekoFi/releases)
 [![License](https://img.shields.io/github/license/rodrigo47363/NekoFi)](https://github.com/rodrigo47363/NekoFi/blob/main/LICENSE)
 [![Issues](https://img.shields.io/github/issues/rodrigo47363/NekoFi)](https://github.com/rodrigo47363/NekoFi/issues)
 
-NekoFi.sh es un script de Bash diseñado para facilitar diversas tareas de auditoría y pruebas de seguridad en redes WiFi. Con NekoFi.sh, puedes escanear redes, capturar handshakes, y realizar ataques WPS y WPA/WPA2, entre otras funcionalidades.
+NekoFi.sh es un script de Bash diseñado para facilitar diversas tareas de auditoría y pruebas de seguridad en redes WiFi. Con NekoFi.sh, puedes escanear redes, capturar handshakes y realizar ataques WPS y WPA/WPA2, entre otras funcionalidades.
 
 ## Características
 
@@ -51,17 +51,17 @@ El script verifica e instala automáticamente estas herramientas si no están pr
 
 ## Instalación
 
-Para instalar y ejecutar NekoFi.sh, sigue los siguientes pasos:
+Para instalar y ejecutar NekoFi.sh, sigue estos pasos:
 
-1. Clona el repositorio o descarga el script directamente:
+1. **Clona el repositorio:**
 
     ```bash
-    git clone https://github.com/rodrigo47363/NekoFi
+    git clone https://github.com/rodrigo47363/NekoFi.git
     cd NekoFi
     chmod +x NekoFi.sh
     ```
 
-2. Ejecuta el script con permisos de superusuario:
+2. **Ejecuta el script con permisos de superusuario:**
 
     ```bash
     sudo ./NekoFi.sh
@@ -71,21 +71,22 @@ Para instalar y ejecutar NekoFi.sh, sigue los siguientes pasos:
 
 Al ejecutar NekoFi.sh, se presentará un menú con las siguientes opciones:
 
-1. Escanear redes WiFi
-2. Capturar Handshake (WPS/PMKID)
-3. Ataque WPS con Reaver
-4. Ataque WPS con PixieWPS
-5. Ataque WPS con Bully
-6. Ataque WPA/WPA2
-7. Ataque WEP
-8. Crear diccionario con Crunch
-9. Crear diccionario personalizado con Cowpatty
-10. Poner interfaz en modo monitor
-11. Poner interfaz en modo managed
-12. Salir
-13. Actualizar NekoFi.sh desde GitHub
-14. Convertir .cap a .hccapx
-0. Ayuda
+1. **Escanear redes WiFi**: Usa `wash` para escanear redes WiFi disponibles.
+2. **Capturar Handshake (WPS/PMKID)**: Usa `hcxdumptool` para capturar handshakes WPS/PMKID.
+3. **Ataque WPS con Reaver**: Ataca redes con WPS usando `Reaver`.
+4. **Ataque WPS con PixieWPS**: Ataca redes con WPS usando `PixieWPS`.
+5. **Ataque WPS con Bully**: Ataca redes con WPS usando `Bully`.
+6. **Ataque WPA/WPA2**: Realiza un ataque WPA/WPA2 usando un diccionario.
+7. **Ataque WEP**: Realiza un ataque WEP.
+8. **Crear diccionario con Crunch**: Crea un diccionario de contraseñas con `Crunch`.
+9. **Crear diccionario personalizado con Cowpatty**: Crea un diccionario personalizado con `Cowpatty`.
+10. **Crackear contraseñas con Hashcat**: Utiliza `hashcat` para crackear contraseñas usando un diccionario.
+11. **Poner interfaz en modo monitor**: Cambia la interfaz seleccionada al modo monitor.
+12. **Poner interfaz en modo managed**: Cambia la interfaz seleccionada al modo managed.
+13. **Salir**: Cierra el script.
+14. **Actualizar NekoFi.sh desde GitHub**: Descarga la última versión del script desde GitHub.
+15. **Convertir .cap a .hccapx**: Convierte un archivo `.cap` a `.hccapx`.
+0. **Ayuda**: Muestra esta ayuda.
 
 ### Ejemplo de Uso
 
@@ -102,6 +103,10 @@ Al ejecutar NekoFi.sh, se presentará un menú con las siguientes opciones:
     Selecciona la opción `3`, ingresa el BSSID y el canal de la red objetivo, y el script ejecutará `reaver` para iniciar el ataque WPS.
 
 Para más detalles, selecciona la opción `0` en el menú para ver la ayuda completa.
+
+## Actualización del Script
+
+Para actualizar `NekoFi.sh` a la última versión, selecciona la opción 14 en el menú. El script descargará la versión más reciente desde GitHub y reemplazará la versión actual.
 
 ## Contribuciones
 
