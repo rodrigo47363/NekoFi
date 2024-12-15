@@ -6,31 +6,57 @@ REPO_URL="https://github.com/rodrigo47363/NekoFi/raw/main/NekoFi.sh"
 SCRIPT_NAME="NekoFi.sh"
 LOCAL_PATH="/usr/local/bin/$SCRIPT_NAME"
 
+#!/bin/bash
+
 # Lista de herramientas necesarias
 tools=(
     iw aircrack-ng xterm tmux iproute2 pciutils usbutils rfkill wget ccze x11-xserver-utils systemd hashcat reaver hcxdumptool
-    john pixiewps bully cowpatty crunch wash procps airgeddon
+    john pixiewps bully cowpatty crunch wash procps airgeddon libcap-dev hcxtools wifite
 )
 
 # Función para verificar e instalar herramientas necesarias
 install_tools() {
     echo "Verificando e instalando herramientas necesarias..."
+
+    # Verificar si el usuario tiene permisos de sudo
+    if ! sudo -v &>/dev/null; then
+        echo "No se pueden realizar instalaciones sin permisos de sudo."
+        exit 1
+    fi
+
+    # Actualización de repositorios
+    echo "Actualizando repositorios..."
+    if ! sudo apt-get update; then
+        echo "Fallo en la actualización de paquetes. Verifica tu conexión a internet."
+        exit 1
+    fi
+
+    # Verificar qué herramientas faltan y agruparlas
+    missing_tools=()
     for tool in "${tools[@]}"; do
         if ! command -v "$tool" &> /dev/null; then
-            echo "Instalando $tool..."
-            if ! sudo apt-get update > /dev/null; then
-                echo "Fallo en la actualización de paquetes"
-                exit 1
-            fi
-            if ! sudo apt-get install -y "$tool" > /dev/null; then
-                echo "Fallo en la instalación de $tool"
-                exit 1
-            fi
+            missing_tools+=("$tool")
         else
             echo "$tool ya está instalado."
         fi
     done
+
+    # Si faltan herramientas, proceder a instalarlas
+    if [ ${#missing_tools[@]} -gt 0 ]; then
+        echo "Instalando las siguientes herramientas: ${missing_tools[@]}"
+        if ! sudo apt-get install -y "${missing_tools[@]}"; then
+            echo "Fallo en la instalación de las herramientas. Verifica los repositorios o el nombre de los paquetes."
+            exit 1
+        fi
+    else
+        echo "Todas las herramientas necesarias ya están instaladas."
+    fi
+
+    echo "Proceso completado."
 }
+
+# Ejecutar la función de instalación
+install_tools
 
 # Función para detectar interfaces de red
 detect_interfaces() {
@@ -62,7 +88,6 @@ manage_monitor_mode() {
     fi
 }
 
-# Función para mostrar el menú de opciones
 mostrar_menu() {
     clear
     echo "#######################################################"
@@ -89,7 +114,29 @@ mostrar_menu() {
     echo "14. Actualizar NekoFi.sh desde GitHub"
     echo "15. Convertir .cap a .hccapx"
     echo "0. Ayuda"
+    echo "Seleccione una opción: "
+    read -r opcion
+    case $opcion in
+        1) escaneo_redes ;;
+        2) capturar_handshake ;;
+        3) ataque_wps_reaver ;;
+        4) ataque_wps_pixiewps ;;
+        5) ataque_wps_bully ;;
+        6) ataque_wpa ;;
+        7) ataque_wep ;;
+        8) crear_diccionario_crunch ;;
+        9) crear_diccionario_cowpatty ;;
+        10) crackear_hashcat ;;
+        11) poner_modo_monitor ;;
+        12) poner_modo_managed ;;
+        13) exit 0 ;;
+        14) actualizar_nokefi ;;
+        15) convertir_cap_hccapx ;;
+        0) mostrar_ayuda ;;
+        *) echo "Opción no válida. Por favor, seleccione una opción válida." ;;
+    esac
 }
+
 
 # Función para mostrar ayuda
 mostrar_ayuda() {
@@ -267,12 +314,11 @@ crear_diccionario_cowpatty() {
     fi
 }
 
-# Función para crackear contraseñas con Hashcat
 crackear_hashcat() {
     echo "Crackeando contraseñas con Hashcat..."
     read -p "Ingrese el archivo .hccapx: " hccapx_file
-    read -p "Ingrese el diccionario de contraseñas: " wordlist
-    if ! hashcat -m 2500 "$hccapx_file" "$wordlist" --force; then
+    read -p "Ingrese el diccionario de contraseñas: " wordlist_file
+    if ! hashcat -m 2500 "$hccapx_file" "$wordlist_file"; then
         echo "Fallo al ejecutar Hashcat"
         exit 1
     fi
