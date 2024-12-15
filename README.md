@@ -46,6 +46,7 @@ NekoFi.sh requiere las siguientes herramientas:
 - `wash`
 - `procps`
 - `airgeddon`
+- - `libcap-dev`
 
 El script verifica e instala automáticamente estas herramientas si no están presentes en el sistema.
 
