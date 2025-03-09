@@ -8,9 +8,12 @@ LOCAL_PATH="/usr/local/bin/$SCRIPT_NAME"
 
 # Lista de herramientas necesarias
 tools=(
-    iw aircrack-ng xterm tmux iproute2 pciutils usbutils rfkill wget ccze x11-xserver-utils systemd hashcat reaver hcxdumptool
-    john pixiewps bully cowpatty crunch wash procps airgeddon libcap-dev hcxtools wifite
+    iw aircrack-ng xterm tmux iproute2 pciutils usbutils rfkill wget ccze ethtool wireless-tools
+    hashcat reaver hcxdumptool john pixiewps bully cowpatty crunch wash procps
+    airgeddon libcap-dev hcxtools wifite bettercap mdk4 macchanger
+    hostapd dnsmasq lighttpd python3-pip mitmproxy responder ettercap
 )
+
 
 # Función para verificar e instalar herramientas necesarias
 install_tools() {
