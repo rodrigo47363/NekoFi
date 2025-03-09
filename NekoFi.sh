@@ -6,8 +6,6 @@ REPO_URL="https://github.com/rodrigo47363/NekoFi/raw/main/NekoFi.sh"
 SCRIPT_NAME="NekoFi.sh"
 LOCAL_PATH="/usr/local/bin/$SCRIPT_NAME"
 
-#!/bin/bash
-
 # Lista de herramientas necesarias
 tools=(
     iw aircrack-ng xterm tmux iproute2 pciutils usbutils rfkill wget ccze x11-xserver-utils systemd hashcat reaver hcxdumptool
