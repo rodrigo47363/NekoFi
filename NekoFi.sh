@@ -91,12 +91,32 @@ manage_monitor_mode() {
 
 mostrar_menu() {
     clear
-    echo "#######################################################"
-    echo "#                                                     #"
-    echo "#             NekoFi.sh                               #"
-    echo "#             Versión 1.4                             #"
-    echo "#             https://github.com/rodrigo47363/NekoFi  #"
-    echo "#######################################################"
+    echo "########################################################"
+    echo "#                                                      #"
+    echo "#                  NekoFi.sh                           #"
+    echo "#                  Versión 1.4                         #"
+    echo "#                                                      #"
+    echo "#  GitHub Proyecto:                                    #"
+    echo "#  https://github.com/rodrigo47363/NekoFi              #"
+    echo "#                                                      #"
+    echo "#  Perfil GitHub:                                      #"
+    echo "#  https://github.com/rodrigo47363                     #"
+    echo "#                                                      #"
+    echo "#  Twitter/X:                                          #"
+    echo "#  https://x.com/rodrigo47363                          #"
+    echo "#                                                      #"
+    echo "#  Donación BTC:                                       #"
+    echo "#  bc1qkzmpd0hry99qms7ef23vsyx9vt34pzzaslpp8y          #"
+    echo "#                                                      #"
+    echo "#  Donación Ethereum:                                  #"
+    echo "#  0xB75bC57C54FCBFF139EBF981A596B019C537d018          #"
+    echo "#                                                      #"
+    echo "#  Donación Solana:                                    #"
+    echo "#  ELekuGHcmZjhXrtHNqHuu8QmdCZr3oCWtTmu3QUQ5hac        #"
+    echo "########################################################"
+}
+
+
     echo
     echo "Seleccione una opción:"
     echo "1. Escanear redes WiFi"
